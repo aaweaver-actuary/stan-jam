@@ -1,0 +1,13 @@
+[package]
+name = "stan-jammer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "stan_jammer"
+crate-type = ["cdylib"]
+
+[dependencies]
+derive_builder = "0.20.2"
+pyo3 = "0.19.0"
