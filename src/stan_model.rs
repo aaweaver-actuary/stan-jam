@@ -1,131 +1,148 @@
+use crate::stan_model_block::StanModelBlock;
+use crate::stan_model_block_type::StanModelBlockType;
+
 #[derive(Debug, PartialEq)]
 pub struct StanModel {
-    pub functions: Option<Vec<String>>,
-    pub data: Vec<String>,
-    pub transformed_data: Option<Vec<String>>,
-    pub parameters: Vec<String>,
-    pub transformed_parameters: Option<Vec<String>>,
-    pub model: Vec<String>,
-    pub generated_quantities: Option<Vec<String>>,
+    pub functions: Option<StanModelBlock>,
+    pub data: StanModelBlock,
+    pub transformed_data: Option<StanModelBlock>,
+    pub parameters: StanModelBlock,
+    pub transformed_parameters: Option<StanModelBlock>,
+    pub model: StanModelBlock,
+    pub generated_quantities: Option<StanModelBlock>,
 }
 
 impl StanModel {
     pub fn new() -> StanModel {
         StanModel {
             functions: None,
-            data: Vec::new(),
+            data: StanModelBlock::new(StanModelBlockType::Data),
             transformed_data: None,
-            parameters: Vec::new(),
+            parameters: StanModelBlock::new(StanModelBlockType::Parameters),
             transformed_parameters: None,
-            model: Vec::new(),
+            model: StanModelBlock::new(StanModelBlockType::Model),
             generated_quantities: None,
         }
     }
 
     pub fn add_function(&mut self, function: &str) {
         match &mut self.functions {
-            Some(functions) => functions.push(function.to_string()),
-            None => self.functions = Some(vec![function.to_string()]),
+            Some(functions) => functions.add(function),
+            None => {
+                self.functions = Some(StanModelBlock::new(StanModelBlockType::Functions));
+                self.functions.as_mut().unwrap().add(function);
+            }
         }
     }
 
+    /// Add a line of Stan code to the data block.
     pub fn add_data(&mut self, data: &str) {
-        self.data.push(data.to_string());
+        self.data.add(data);
     }
 
     pub fn add_transformed_data(&mut self, data: &str) {
         match &mut self.transformed_data {
-            Some(transformed_data) => transformed_data.push(data.to_string()),
-            None => self.transformed_data = Some(vec![data.to_string()]),
+            Some(transformed_data) => transformed_data.add(data),
+            None => {
+                self.transformed_data =
+                    Some(StanModelBlock::new(StanModelBlockType::TransformedData));
+                self.transformed_data.as_mut().unwrap().add(data);
+            }
         }
     }
 
     pub fn add_parameter(&mut self, parameter: &str) {
-        self.parameters.push(parameter.to_string());
+        self.parameters.add(parameter);
     }
 
     pub fn add_transformed_parameter(&mut self, parameter: &str) {
         match &mut self.transformed_parameters {
-            Some(transformed_parameters) => transformed_parameters.push(parameter.to_string()),
-            None => self.transformed_parameters = Some(vec![parameter.to_string()]),
+            Some(transformed_parameters) => transformed_parameters.add(parameter),
+            None => {
+                self.transformed_parameters = Some(StanModelBlock::new(
+                    StanModelBlockType::TransformedParameters,
+                ));
+                self.transformed_parameters.as_mut().unwrap().add(parameter);
+            }
         }
     }
 
     pub fn add_model(&mut self, model: &str) {
-        self.model.push(model.to_string());
+        self.model.add(model);
     }
 
     pub fn add_generated_quantities(&mut self, quantity: &str) {
         match &mut self.generated_quantities {
-            Some(generated_quantities) => generated_quantities.push(quantity.to_string()),
-            None => self.generated_quantities = Some(vec![quantity.to_string()]),
+            Some(generated_quantities) => generated_quantities.add(quantity),
+            None => {
+                self.generated_quantities =
+                    Some(StanModelBlock::new(StanModelBlockType::GeneratedQuantities));
+                self.generated_quantities.as_mut().unwrap().add(quantity);
+            }
         }
     }
 
-    fn get_functions_string(&self) -> Option<Vec<String>> {
-        self.functions
-            .as_ref()
-            .map(|functions| functions.to_owned())
+    fn get_optional_block(
+        &self,
+        block: &Option<StanModelBlock>,
+        block_type: StanModelBlockType,
+    ) -> StanModelBlock {
+        block.as_ref().map(|block| block.to_owned()).unwrap_or({
+            let mut block = StanModelBlock::new(block_type);
+            block.add("");
+            block
+        })
     }
 
-    fn get_data_string(&self) -> Vec<String> {
+    fn get_functions(&self) -> StanModelBlock {
+        self.get_optional_block(&self.functions, StanModelBlockType::Functions)
+    }
+
+    fn get_data(&self) -> StanModelBlock {
         self.data.to_owned()
     }
 
-    fn get_transformed_data_string(&self) -> Option<Vec<String>> {
-        self.transformed_data
-            .as_ref()
-            .map(|transformed_data| transformed_data.to_owned())
+    fn get_transformed_data(&self) -> StanModelBlock {
+        self.get_optional_block(&self.transformed_data, StanModelBlockType::TransformedData)
     }
 
-    fn get_parameters_string(&self) -> Vec<String> {
+    fn get_parameters(&self) -> StanModelBlock {
         self.parameters.to_owned()
     }
 
-    fn get_transformed_parameters_string(&self) -> Option<Vec<String>> {
-        self.transformed_parameters
-            .as_ref()
-            .map(|transformed_parameters| transformed_parameters.to_owned())
+    fn get_transformed_parameters(&self) -> StanModelBlock {
+        self.get_optional_block(
+            &self.transformed_parameters,
+            StanModelBlockType::TransformedParameters,
+        )
     }
 
-    fn get_model_string(&self) -> Vec<String> {
+    fn get_model(&self) -> StanModelBlock {
         self.model.to_owned()
     }
 
-    fn get_generated_quantities_string(&self) -> Option<Vec<String>> {
-        self.generated_quantities
-            .as_ref()
-            .map(|generated_quantities| generated_quantities.to_owned())
+    fn get_generated_quantities(&self) -> StanModelBlock {
+        self.get_optional_block(
+            &self.generated_quantities,
+            StanModelBlockType::GeneratedQuantities,
+        )
     }
 
-    pub fn stanmodel_strings(&self) -> Vec<String> {
-        self.get_functions_string()
-            .unwrap_or_default()
-            .iter()
-            .chain(self.get_data_string().iter())
-            .chain(
-                self.get_transformed_data_string()
-                    .unwrap_or_default()
-                    .iter(),
-            )
-            .chain(self.get_parameters_string().iter())
-            .chain(
-                self.get_transformed_parameters_string()
-                    .unwrap_or_default()
-                    .iter(),
-            )
-            .chain(self.get_model_string().iter())
-            .chain(
-                self.get_generated_quantities_string()
-                    .unwrap_or_default()
-                    .iter(),
-            )
+    pub fn collect_stan_model_segments(&self) -> Vec<String> {
+        self.get_functions()
+            .get_code()
+            .chain(self.get_data().get_code())
+            .chain(self.get_transformed_data().get_code())
+            .chain(self.get_parameters().get_code())
+            .chain(self.get_transformed_parameters().get_code())
+            .chain(self.get_model().get_code())
+            .chain(self.get_generated_quantities().get_code())
             .map(|s| s.to_string())
             .collect::<Vec<String>>()
     }
 
     pub fn has_include_directive(&self) -> bool {
-        self.stanmodel_strings()
+        self.collect_stan_model_segments()
             .iter()
             .any(|s| s.contains("#include"))
     }
@@ -145,11 +162,11 @@ mod tests {
     fn can_create_model() {
         let model1 = StanModel {
             functions: None,
-            data: Vec::new(),
+            data: StanModelBlock::new(StanModelBlockType::Data),
             transformed_data: None,
-            parameters: Vec::new(),
+            parameters: StanModelBlock::new(StanModelBlockType::Parameters),
             transformed_parameters: None,
-            model: Vec::new(),
+            model: StanModelBlock::new(StanModelBlockType::Model),
             generated_quantities: None,
         };
 
@@ -164,13 +181,11 @@ mod tests {
         model.add_function("real foo(real x) { return x; }");
         model.add_function("real bar(real x) { return x; }");
 
-        assert_eq!(
-            model.functions,
-            Some(vec![
-                "real foo(real x) { return x; }".to_string(),
-                "real bar(real x) { return x; }".to_string()
-            ])
-        );
+        let mut functions_block = StanModelBlock::new(StanModelBlockType::Functions);
+        functions_block.add("real foo(real x) { return x; }");
+        functions_block.add("real bar(real x) { return x; }");
+
+        assert_eq!(model.functions, Some(functions_block));
     }
 
     #[test]
@@ -179,10 +194,11 @@ mod tests {
         model.add_data("int<lower=0> N;");
         model.add_data("int y[N];");
 
-        assert_eq!(
-            model.data,
-            vec!["int<lower=0> N;".to_string(), "int y[N];".to_string()]
-        );
+        let mut data = StanModelBlock::new(StanModelBlockType::Data);
+        data.add("int<lower=0> N;");
+        data.add("int y[N];");
+
+        assert_eq!(model.data, data);
     }
 
     #[test]
@@ -191,10 +207,11 @@ mod tests {
         model.add_transformed_data("int<lower=0> N;");
         model.add_transformed_data("int y[N];");
 
-        assert_eq!(
-            model.transformed_data,
-            Some(vec!["int<lower=0> N;".to_string(), "int y[N];".to_string()])
-        );
+        let mut transformed_data_block = StanModelBlock::new(StanModelBlockType::TransformedData);
+        transformed_data_block.add("int<lower=0> N;");
+        transformed_data_block.add("int y[N];");
+
+        assert_eq!(model.transformed_data, Some(transformed_data_block));
     }
 
     #[test]
@@ -202,7 +219,10 @@ mod tests {
         let mut model = StanModel::new();
         model.add_parameter("real<lower=0> sigma;");
 
-        assert_eq!(model.parameters, vec!["real<lower=0> sigma;".to_string()]);
+        let mut parameter_block = StanModelBlock::new(StanModelBlockType::Parameters);
+        parameter_block.add("real<lower=0> sigma;");
+
+        assert_eq!(model.parameters, parameter_block);
     }
 
     #[test]
@@ -211,12 +231,14 @@ mod tests {
         model.add_transformed_parameter("real mu;");
         model.add_transformed_parameter("real<lower=0> sigma;");
 
+        let mut transformed_parameters_block =
+            StanModelBlock::new(StanModelBlockType::TransformedParameters);
+        transformed_parameters_block.add("real mu;");
+        transformed_parameters_block.add("real<lower=0> sigma;");
+
         assert_eq!(
             model.transformed_parameters,
-            Some(vec![
-                "real mu;".to_string(),
-                "real<lower=0> sigma;".to_string()
-            ])
+            Some(transformed_parameters_block)
         );
     }
 
@@ -225,7 +247,10 @@ mod tests {
         let mut model = StanModel::new();
         model.add_model("mu ~ normal(0, 1);");
 
-        assert_eq!(model.model, vec!["mu ~ normal(0, 1);".to_string()]);
+        let mut model_block = StanModelBlock::new(StanModelBlockType::Model);
+        model_block.add("mu ~ normal(0, 1);");
+
+        assert_eq!(model.model, model_block);
     }
 
     #[test]
@@ -234,13 +259,12 @@ mod tests {
         model.add_generated_quantities("real y_pred[N];");
         model.add_generated_quantities("for (n in 1:N) { y_pred[n] = normal_rng(mu, sigma); }");
 
-        assert_eq!(
-            model.generated_quantities,
-            Some(vec![
-                "real y_pred[N];".to_string(),
-                "for (n in 1:N) { y_pred[n] = normal_rng(mu, sigma); }".to_string()
-            ])
-        );
+        let mut generated_quantities_block =
+            StanModelBlock::new(StanModelBlockType::GeneratedQuantities);
+        generated_quantities_block.add("real y_pred[N];");
+        generated_quantities_block.add("for (n in 1:N) { y_pred[n] = normal_rng(mu, sigma); }");
+
+        assert_eq!(model.generated_quantities, Some(generated_quantities_block));
     }
 
     #[test]
@@ -265,5 +289,13 @@ mod tests {
         noincludes.add_generated_quantities("real y_pred[N];");
 
         assert!(!noincludes.has_include_directive());
+    }
+
+    #[test]
+    fn default_model_is_the_same_as_new_model() {
+        let default_model = StanModel::default();
+        let new_model = StanModel::new();
+
+        assert_eq!(default_model, new_model);
     }
 }

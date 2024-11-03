@@ -1,4 +1,6 @@
 pub mod stan_model;
+pub mod stan_model_block;
+pub mod stan_model_block_type;
 pub mod stan_source_parser;
 // use pyo3::prelude::*;
 
